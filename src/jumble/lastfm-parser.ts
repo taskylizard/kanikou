@@ -2,6 +2,7 @@ import { match, P } from 'ts-pattern'
 import { normalizeAnswer } from './answer.ts'
 import { createAnswerVariants, mergeAnswerVariantLists, mergeImageUrlLists } from './candidate.ts'
 import { LastFmEnvelopeSchema, type LastFmEnvelope } from './lastfm-types.ts'
+import { mergeNormalizedValues, optionalTextSchema } from './parser-primitives.ts'
 import type { JumbleArtistMetadata, JumbleCandidate, JumbleKind } from './types.ts'
 
 export function parseLastFmTopItems(payload: LastFmEnvelope, kind: JumbleKind): JumbleCandidate[] {
@@ -150,9 +151,7 @@ export function isLastFmEnvelope(value: unknown): value is LastFmEnvelope {
 }
 
 export function parseLastFmString(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined
-  const trimmed = value.trim()
-  return trimmed.length === 0 ? undefined : trimmed.slice(0, 512)
+  return optionalTextSchema().parse(value)
 }
 
 function parseTopItem(value: unknown, kind: JumbleKind): JumbleCandidate[] {
@@ -225,9 +224,7 @@ function mergeTagValues(
   first: readonly string[] | undefined,
   second: readonly string[] | undefined
 ): string[] | undefined {
-  const values = [...(first ?? []), ...(second ?? [])]
-  const unique = [...new Map(values.map((value) => [normalizeAnswer(value), value])).values()]
-  return unique.length === 0 ? undefined : unique.slice(0, 8)
+  return mergeNormalizedValues(first, second, normalizeAnswer)
 }
 
 function firstImages(value: unknown): string[] {

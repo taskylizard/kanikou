@@ -1,5 +1,13 @@
 import { z } from 'zod'
 import { createAnswerVariants, mergeAnswerVariantLists, mergeImageUrlLists } from './candidate.ts'
+import {
+  coercedNumberSchema,
+  envelopeArraySchema,
+  foldEquals,
+  mergeNormalizedValues,
+  optionalTextSchema,
+  unknownArraySchema
+} from './parser-primitives.ts'
 import type { JumbleArtistMetadata } from './types.ts'
 import {
   MusicBrainzEnvelopeSchema,
@@ -8,20 +16,10 @@ import {
   type ReleaseMetadata
 } from './musicbrainz-types.ts'
 
-const UnknownArraySchema = z.array(z.unknown()).catch([])
-const MusicBrainzEnvelopeArraySchema = z.array(MusicBrainzEnvelopeSchema).catch([])
-const OptionalMusicBrainzTextSchema = z.unknown().transform((value): string | undefined => {
-  if (typeof value !== 'string') return undefined
-  const trimmed = value.trim()
-  return trimmed.length === 0 ? undefined : trimmed
-})
-const MusicBrainzNumberSchema = z.unknown().transform((value): number => {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value !== 'string' || value.trim() === '') return 0
-
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : 0
-})
+const UnknownArraySchema = unknownArraySchema
+const MusicBrainzEnvelopeArraySchema = envelopeArraySchema(MusicBrainzEnvelopeSchema)
+const OptionalMusicBrainzTextSchema = optionalTextSchema(undefined)
+const MusicBrainzNumberSchema = coercedNumberSchema()
 const CoverArtArchiveSchema = z.object({ front: z.boolean().optional() })
 
 export function parseArtist(payload: MusicBrainzEnvelope | null): JumbleArtistMetadata | undefined {
@@ -48,12 +46,12 @@ export function chooseArtist(
 ): JumbleArtistMetadata | undefined {
   const artists = MusicBrainzEnvelopeArraySchema.parse(payload?.artists)
   const exact = artists
-    .filter(
-      (artist) =>
-        OptionalMusicBrainzTextSchema.parse(artist.name)?.localeCompare(name, undefined, {
-          sensitivity: 'base'
-        }) === 0 || aliasMatches(artist.aliases, name)
-    )
+    .filter((artist) => {
+      const parsed = OptionalMusicBrainzTextSchema.parse(artist.name)
+      return (
+        (parsed !== undefined && foldEquals(parsed, name)) || aliasMatches(artist.aliases, name)
+      )
+    })
     .toSorted(
       (first, second) =>
         MusicBrainzNumberSchema.parse(second.score) - MusicBrainzNumberSchema.parse(first.score)
@@ -163,12 +161,10 @@ export function chooseReleaseGroup(
 ): MusicBrainzEnvelope | undefined {
   const groups = MusicBrainzEnvelopeArraySchema.parse(payload?.['release-groups'])
   return groups
-    .filter(
-      (group) =>
-        OptionalMusicBrainzTextSchema.parse(group.title)?.localeCompare(name, undefined, {
-          sensitivity: 'base'
-        }) === 0 || aliasMatches(group.aliases, name)
-    )
+    .filter((group) => {
+      const parsed = OptionalMusicBrainzTextSchema.parse(group.title)
+      return (parsed !== undefined && foldEquals(parsed, name)) || aliasMatches(group.aliases, name)
+    })
     .filter(
       (group) => artistName === undefined || artistCreditMatches(group['artist-credit'], artistName)
     )
@@ -186,12 +182,13 @@ export function chooseRecording(
   const recordings = MusicBrainzEnvelopeArraySchema.parse(payload?.recordings)
   return (
     recordings
-      .filter(
-        (recording) =>
-          OptionalMusicBrainzTextSchema.parse(recording.title)?.localeCompare(name, undefined, {
-            sensitivity: 'base'
-          }) === 0 || aliasMatches(recording.aliases, name)
-      )
+      .filter((recording) => {
+        const parsed = OptionalMusicBrainzTextSchema.parse(recording.title)
+        return (
+          (parsed !== undefined && foldEquals(parsed, name)) ||
+          aliasMatches(recording.aliases, name)
+        )
+      })
       .filter(
         (recording) =>
           artistName === undefined || artistCreditMatches(recording['artist-credit'], artistName)
@@ -243,11 +240,7 @@ export function mergeMusicBrainzTags(
   first: readonly string[] | undefined,
   second: readonly string[] | undefined
 ): string[] | undefined {
-  const values = [...(first ?? []), ...(second ?? [])]
-  const unique = [
-    ...new Map(values.map((value) => [normalizeMusicBrainzKey(value), value])).values()
-  ]
-  return unique.length === 0 ? undefined : unique.slice(0, 8)
+  return mergeNormalizedValues(first, second, normalizeMusicBrainzKey)
 }
 
 export function normalizeMusicBrainzKey(value: string): string {
@@ -297,20 +290,17 @@ function artistCreditMatches(value: unknown, artistName: string): boolean {
     const artistEntry = artistResult.success ? artistResult.data : undefined
     const artist =
       artistEntry === undefined ? undefined : OptionalMusicBrainzTextSchema.parse(artistEntry.name)
+    const creditName = OptionalMusicBrainzTextSchema.parse(credit.name)
     return (
-      OptionalMusicBrainzTextSchema.parse(credit.name)?.localeCompare(artistName, undefined, {
-        sensitivity: 'base'
-      }) === 0 ||
-      artist?.localeCompare(artistName, undefined, { sensitivity: 'base' }) === 0 ||
+      (creditName !== undefined && foldEquals(creditName, artistName)) ||
+      (artist !== undefined && foldEquals(artist, artistName)) ||
       aliasMatches(artistEntry?.aliases, artistName)
     )
   })
 }
 
 function aliasMatches(value: unknown, expected: string): boolean {
-  return parseAliasEntries(value, 32).some(
-    (alias) => alias.localeCompare(expected, undefined, { sensitivity: 'base' }) === 0
-  )
+  return parseAliasEntries(value, 32).some((alias) => foldEquals(alias, expected))
 }
 
 function parseNames(value: unknown): string[] | undefined {

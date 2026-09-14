@@ -2,6 +2,8 @@ import { toolActivityLabel } from './tools/tool-labels.ts'
 
 export const THINKING_RESPONSE = '*Thinking...*'
 
+export const GENERATION_ERROR_RESPONSE = "❌ Couldn't generate a reply. Try again in a moment."
+
 // tasky: the footer is kanikou UI chrome; strip echoed or previously-appended copies
 // (including consecutive ones) before formatting, so the rendered footer never repeats
 const TOOLS_FOOTER_PATTERN = /(?:^|\r?\n)(?:-# Tools: [^\r\n]*\r?\n?)+$/u

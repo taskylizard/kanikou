@@ -1,7 +1,12 @@
 import { unique } from 'radashi'
 import { match } from 'ts-pattern'
-import { z } from 'zod'
 import { normalizeAnswer, removeEditionSuffix } from './answer.ts'
+import {
+  coercedNumberSchema,
+  envelopeArraySchema,
+  optionalTextSchema,
+  unknownArraySchema
+} from './parser-primitives.ts'
 import { createAnswerVariants, mergeImageUrlLists } from './candidate.ts'
 import {
   DiscogsEnvelopeSchema,
@@ -11,20 +16,10 @@ import {
 } from './discogs-types.ts'
 import type { JumbleAlbumCandidate, JumbleTrackCandidate } from './types.ts'
 
-const UnknownArraySchema = z.array(z.unknown()).catch([])
-const DiscogsEnvelopeArraySchema = z.array(DiscogsEnvelopeSchema).catch([])
-const OptionalDiscogsTextSchema = z.unknown().transform((value): string | undefined => {
-  if (typeof value !== 'string') return undefined
-  const trimmed = value.trim()
-  return trimmed.length === 0 ? undefined : trimmed.slice(0, 512)
-})
-const DiscogsNumberSchema = z.unknown().transform((value): number => {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value !== 'string' || value.trim() === '') return 0
-
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : 0
-})
+const UnknownArraySchema = unknownArraySchema
+const DiscogsEnvelopeArraySchema = envelopeArraySchema(DiscogsEnvelopeSchema)
+const OptionalDiscogsTextSchema = optionalTextSchema()
+const DiscogsNumberSchema = coercedNumberSchema()
 
 export function parseDiscogsSearch(payload: unknown): DiscogsSearchResult[] {
   const root = DiscogsEnvelopeSchema.safeParse(payload)

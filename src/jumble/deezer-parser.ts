@@ -2,6 +2,7 @@ import { match } from 'ts-pattern'
 import { z } from 'zod'
 import { normalizeAnswer } from './answer.ts'
 import { mergeImageUrlLists } from './candidate.ts'
+import { foldEquals } from './parser-primitives.ts'
 import type { DeezerParseResult } from './deezer-types.ts'
 import type { JumbleCandidate } from './types.ts'
 
@@ -167,12 +168,11 @@ function exactName(actual: string, expected: string): boolean {
   if (actualNormalized.length > 0 && expectedNormalized.length > 0) {
     return actualNormalized === expectedNormalized
   }
-  return actual.trim().localeCompare(expected.trim(), undefined, { sensitivity: 'base' }) === 0
+  return foldEquals(actual, expected)
 }
 
 function titleScore(actual: string, expected: string): number {
-  if (actual.trim().localeCompare(expected.trim(), undefined, { sensitivity: 'base' }) === 0)
-    return 2
+  if (foldEquals(actual, expected)) return 2
   return Number(!(/\blive\b/iu.test(actual) && !/\blive\b/iu.test(expected)))
 }
 

@@ -1,5 +1,6 @@
 import { match } from 'ts-pattern'
 import { normalizeAnswer } from './answer.ts'
+import { mergeNormalizedValues } from './parser-primitives.ts'
 import type {
   JumbleAnswerSource,
   JumbleAnswerVariant,
@@ -263,17 +264,13 @@ function mergeTextValues(
   second: readonly string[] | undefined
 ): string[] | undefined {
   const values = [...(first ?? []), ...(second ?? [])]
-  const unique: string[] = []
-  for (const value of values) {
-    const trimmed = value.trim().slice(0, 128)
-    if (trimmed.length === 0) continue
-    const key = normalizeAnswer(trimmed) || trimmed.toLocaleLowerCase()
-    if (!unique.some((entry) => (normalizeAnswer(entry) || entry.toLocaleLowerCase()) === key)) {
-      unique.push(trimmed)
-    }
-    if (unique.length >= 8) break
-  }
-  return unique.length === 0 ? undefined : unique
+    .map((value) => value.trim().slice(0, 128))
+    .filter((value) => value.length > 0)
+  return mergeNormalizedValues(
+    values,
+    [],
+    (value) => normalizeAnswer(value) || value.toLocaleLowerCase()
+  )
 }
 
 function answerVariantKey(value: string): string {

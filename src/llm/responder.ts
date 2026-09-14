@@ -10,6 +10,7 @@ import type { ScopedToolProvider, ScopedToolSet, ToolScope } from './mintlify-mc
 import {
   formatCompletedResponse,
   formatThinkingProgress,
+  GENERATION_ERROR_RESPONSE,
   THINKING_RESPONSE
 } from './tool-progress.ts'
 import { traceOperation } from '../observability/tracing.ts'
@@ -147,9 +148,28 @@ export class KanikouResponder {
             event: 'generation.error',
             traceId
           })
+          await this.#reportGenerationError(context, target, progressUpdate)
           throw error
         }
       }
     )
+  }
+
+  /**
+   * Replaces the "*Thinking...*" placeholder with a short error message when
+   * generation fails. Delivery must never mask the original error, so any
+   * failure here is only logged.
+   */
+  async #reportGenerationError(
+    context: BotContext,
+    target: ResponseTarget,
+    progressUpdate: Promise<void>
+  ): Promise<void> {
+    try {
+      await progressUpdate.catch(() => undefined)
+      await sendResponse(context, target, GENERATION_ERROR_RESPONSE)
+    } catch (error) {
+      context.logger.error('failed to report generation error', { error })
+    }
   }
 }

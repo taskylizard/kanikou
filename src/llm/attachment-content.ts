@@ -1,13 +1,14 @@
 import type { FilePart, TextPart } from 'ai'
 import type { PromptAttachment } from './message-input-types.ts'
 
-type MediaCategory = 'image' | 'video' | 'audio' | 'other'
+type MediaCategory = 'image' | 'video' | 'audio' | 'text' | 'other'
 
 /* tasky: categorize by top-level type prefix so we dont accidentally match "image" in a random subtype */
 function categorizeMedia(contentType: string): MediaCategory {
   if (contentType.startsWith('image/')) return 'image'
   if (contentType.startsWith('video/')) return 'video'
   if (contentType.startsWith('audio/')) return 'audio'
+  if (contentType.startsWith('text/')) return 'text'
   return 'other'
 }
 
@@ -30,13 +31,11 @@ export async function downloadFile(
 }
 
 /**
- * Converts a Discord attachment into an AI SDK content part for OpenRouter.
+ * Converts a Discord attachment into an AI SDK content part.
  *
- * Images, videos, and documents (PDFs, etc.) are passed as URL-based file parts.
- * Audio must be base64-encoded for OpenRouter, so it is downloaded and passed
- * as raw bytes.
- *
- * `fetchFile` defaults to the global `fetch` and is injectable for testing.
+ * Images and videos stay as URL file parts. Everything else is downloaded,
+ * because Gemini rejects https URLs for file parts. Text becomes a text part;
+ * other media is passed as bytes. `fetchFile` is injectable for testing.
  */
 export async function attachmentContentPart(
   attachment: PromptAttachment,
@@ -45,23 +44,22 @@ export async function attachmentContentPart(
   const mediaType = attachment.contentType ?? ''
   const category = categorizeMedia(mediaType)
 
-  if (category === 'audio') {
-    /* tasky: openrouter rejects audio URLs, it needs base64 - download and encode */
-    const data = await downloadFile(attachment.url, fetchFile)
-    if (data === undefined) {
-      return audioFallback(attachment.url)
-    }
-
-    return { data, mediaType, type: 'file' }
+  if (mediaType === '') {
+    return { text: `[attachment: ${attachment.url}]`, type: 'text' }
   }
 
-  if (mediaType !== '') {
+  if (category === 'image' || category === 'video') {
     return { data: new URL(attachment.url), mediaType, type: 'file' }
   }
 
-  return { text: `[attachment: ${attachment.url}]`, type: 'text' }
-}
+  const data = await downloadFile(attachment.url, fetchFile)
+  if (data === undefined) {
+    return { text: `[attachment: ${attachment.url}]`, type: 'text' }
+  }
 
-function audioFallback(url: string): TextPart {
-  return { text: `[audio attachment: ${url}]`, type: 'text' }
+  if (category === 'text') {
+    return { text: new TextDecoder().decode(data), type: 'text' }
+  }
+
+  return { data, mediaType, type: 'file' }
 }

@@ -10,6 +10,7 @@ import {
 } from './candidate.ts'
 import { PIXELATION_LEVELS } from './renderer.ts'
 import { JumbleRepository } from './repository.ts'
+import { normalizeLastFmUsername } from './lastfm-parser.ts'
 import { JUMBLE_KINDS } from './types.ts'
 import type {
   JumbleActionResult,
@@ -96,7 +97,7 @@ export class JumbleService {
   }
 
   async setProfile(discordUserId: string, username: string): Promise<string> {
-    let normalized = username.trim().replace(/^@/u, '').slice(0, 64)
+    let normalized = normalizeLastFmUsername(username)
     if (normalized.length < 1) throw new JumbleError('Enter a Last.fm username.', 'profile-missing')
     if (this.provider.validateUsername !== undefined) {
       normalized = (await this.provider.validateUsername(normalized)).trim().slice(0, 64)
