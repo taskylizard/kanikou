@@ -1,0 +1,13 @@
+diff --git a/dist/lib/gateway/Shard.js b/dist/lib/gateway/Shard.js
+index 15d27c6000ff38c8aedaf221a1708de1db62593c..e161a88cc2e341cb8804f614a6a6cb79183c880d 100644
+--- a/dist/lib/gateway/Shard.js
++++ b/dist/lib/gateway/Shard.js
+@@ -505,6 +505,8 @@ class Shard extends TypedEmitter_1.default {
+         }
+         if (this.ws.readyState !== ws_1.default.CLOSED) {
+             this.ws.removeAllListeners();
++            // tasky: ws emits handshake-abort errors on the next tick, after disconnect returns
++            this.ws.on("error", this.onWSError);
+             try {
+                 if (reconnect && this.sessionID) {
+                     if (this.ws.readyState === ws_1.default.OPEN) {

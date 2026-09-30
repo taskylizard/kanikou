@@ -16,6 +16,8 @@ minimumReleaseAgeExclude:
   - rosepack@0.1.0 || 0.2.0 || 0.3.0 || 0.4.0 || 0.5.0 || 0.5.1
 overrides:
   vite: 'catalog:'
+patchedDependencies:
+  oceanic.js@1.14.0: patches/oceanic.js@1.14.0.patch
 peerDependencyRules:
   allowAny:
     - vite
