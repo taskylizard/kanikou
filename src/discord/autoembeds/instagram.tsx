@@ -95,7 +95,7 @@ export function instagramMediaMessage(
   return ComponentMessage({
     children: [
       <Container accentColor={INSTAGRAM_COMPONENT_COLOR}>
-        <TextDisplay>## Instagram\n-# Media preview</TextDisplay>
+        <TextDisplay>{'## Instagram\n-# Media preview'}</TextDisplay>
         {assets.mediaItems.length > 0 ? (
           <MediaGallery>
             {assets.mediaItems.map((item) => (
